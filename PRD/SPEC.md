@@ -1,847 +1,703 @@
 # 保險資料對比 + 理賠流程 — 規格計劃書 v2.2.1
 
-> 版本：v2.2.1｜更新日期：2026-07-11｜維護者：Sophia (CPO)
-> 對接技術：Alan (CTO) + Hermes Agent
-> Demo：https://insurance-hub-one.vercel.app/
-> 原始碼：https://github.com/openclawsean024-create/insurance-hub
+> 版本：v2.2.1｜更新日期：2026-07-19｜維護者：Sophia (CPO) / 對接技術：Alan (CTO)
+> 主題：**保險單 QR 碼掃描 + 個人保險資料夾**（不做銷售導購）
+> Sweet Spot 定位：**「我的保險」個人資料夾 + 理賠流程 SOP**
+> 文件版本：v2.2.1（2026-07-19 sweet-spot-driven rewrite）
 
 ---
 
-## 1. 產品概述 (Product Overview)
+## §0 文件資訊
 
-### 1.1 問題陳述 (Problem Statement)
+| 欄位 | 值 |
+|---|---|
+| 專案代號 | insurance-hub |
+| GitHub | https://github.com/openclawsean024-create/insurance-hub |
+| 開發模式 | 純前端 SPA + localStorage（v2 加雲端同步） |
+| 目標市場 | 繁體中文使用者（台灣，25-50 歲已購保族群） |
+| 變現模式 | 免費 + 廣告 + Premium NT$99/月（無限保單 + 家人都保險資料夾） |
+| 文件版本 | v2.2.1（2026-07-19 sweet-spot-driven rewrite） |
+| Sweet Spot 分數 | **5 / 7**（甜蜜點存在，但金管會監管 + 付費弱） |
+| 行動建議 | **investigate**（§11 驗證後啟動開發） |
 
-台灣保險市場長年存在三大結構性痛點，讓一般民眾在投保與理賠兩個階段都處於高度資訊不對稱的位置：
+---
 
-1. **保單散落難以管理**：多數保戶手上同時持有壽險、醫療險、意外險、產險等不同公司保單，紙本與 PDF 散落在抽屜、Email、LINE 群組。出險時往往找不到自己有哪些保障，也不知道保障額度與到期日。
-2. **條款複雜、無法檯向比較**：各家保險公司的除外責任、等待期、給付條件、理賠文件要求皆不同。保戶難以用一致標準評估「哪一張保單對我最好」，業務員亦難以提供中立比較。
-3. **理賠流程黑箱**：出險後民眾常不知道第一步該做什麼 — 要通知誰、要準備什麼文件、要多久能拿到錢 — 導致錯過時效或漏報項目，理賠權益受損。銀髮族群子女更是經常需要代為處理，跨世代資訊傳遞斷裂。
+## §1 產品概述
 
-**市場痛點量化**：
-- 台灣保險滲透率全球第 1（每人平均 3.2 張保單）
-- 保險類申訴常年高居前三名（金融消費評議中心 2025 統計）
-- **超過 60% 申訴與「理賠認定」「條款理解落差」相關**
-- 出險後民眾平均花 **12 小時**摸索理賠流程
+### §1.1 問題陳述
 
-### 1.2 目標使用者 (User Personas)
+**市場現況（Sweet Spot 體檢結果）**：
+- **Finfo / MY83 已佔保險比較市場**：Finfo 月活躍 80 萬、MY83 月活躍 50 萬，皆主打保險比較 + 內容
+- **金管會監管嚴格**：保險業務員需有「業務員證」、招攬行為需合規；個人開發者無法做銷售導購
+- **B2C 月訂閱付費意願弱**：保險是「低頻決策」，使用者願意花 NT$1,000+ 買保險，但不願付 NT$99/月 訂閱工具
+- **保險業務員有「單一視窗」需求**：業務員需管理 100+ 客戶保單，目前用 Excel
 
-| Persona | 規模 | 核心痛點 | 願付價格 |
+**剩下的甜蜜縫隙（Sean 一人公司可切入的）**：
+1. **「我的保險」個人資料夾**：用 QR Code 掃描保單 + OCR 自動建檔（不賣保險）
+2. **理賠流程 SOP**：用 OCR 掃描診斷書 + 自動產出理賠申請書草稿
+3. **保險到期提醒**：儲存保單後，主動提醒續保/到期
+4. **家庭保險資料夾**：管理 5-10 個家人的保單（v2 Premium 變現場景）
+
+**本 PRD 的問題假設**：
+> 「已購保險的消費者想要的是『隨時能找到我的保單、知道怎麼理賠』，不是『比較新保險』。」
+
+驗證方式見 §11。
+
+### §1.2 目標使用者 (User Personas)
+
+| Persona | 規模 (台灣估) | 痛點 | 對應功能 |
 |---|---|---|---|
-| **一般保戶（小芳）** | 1,500 萬 | 保單分散、理賠流程不清楚 | NT$0（免費） |
-| **保險經紀人（小華）** | 8 萬 | 客戶保單管理、比較報表 | NT$499/月 |
-| **銀髮族子女（小雯）** | 200 萬 | 代父母管理保單、協助理賠 | NT$99/月 |
-| **企業福委（Linda）** | 5,000 | 員工團保管理 + 理賠諮詢 | NT$2,999/月 |
+| **P1：30-50 已購保者**（最大宗） | ~600 萬 | 手上有 3-10 張保單，紙本散落，需要找時找不到 | 「我的保險」資料夾 |
+| **P2：保險業務員**（小但黏） | ~30,000 人 | 需管理 100+ 客戶保單，目前用 Excel | 客戶保險資料夾（B2B） |
+| **P3：新手爸媽**（次大宗） | ~50 萬/年 | 需幫新生兒規劃保險，但 Finfo/MY83 比較文看不懂 | 簡單保險類型教學 + 個人資料夾 |
+| **P4：理賠需求者**（跨族） | ~200 萬/年 | 出險時不知道怎麼申請理賠，常錯過資料準備 | 理賠流程 SOP |
 
-### 1.3 核心價值主張 (Value Proposition)
+> 本 MVP **只服務 P1 + P4**，P2 業務員版留到 v2 驗證後再加，P3 新手爸媽留到 v3。
 
-> 「**保險地圖** — 把全台 30 家保險公司的保單、條款、理賠 SOP 全部集中在一個平台。保單自動彙整、條款並排比較、理賠流程 step-by-step 跟蹤。出險不再慌張，三步驟完成理賠。」
+### §1.3 核心價值主張
 
-**三大差異化**：
-1. **純前端 + localStorage 個資零外流**：100% 隱私保護，零密碼、零後端、無需登入
-2. **30 家保險公司預載資料**：金管會公開資訊 + 保發中心 + 公司官網彙整
-3. **6 種險種 SOP 透明化**：住院/手術/癌症/失能/身故/意外，每階段 T+X 時間軸
+> **「QR 掃一下，所有保單都在手機 — 不賣保險、不比較保險，只幫你管好你的保單。」**
 
-### 1.4 商業目標 (KPIs / OKRs)
+**相對 Top 3 競爭者的差異化**：
 
-| 時間 | KPI | 目標值 |
+| 競爭者 | 他們做什麼 | 我們不做 | 我們做（甜蜜點） |
+|---|---|---|---|
+| **Finfo / MY83** | 保險比較 + 內容 + 業務員媒合 | 比較新保險、銷售導購 | 已購保單管理 + 理賠 SOP |
+| **保險公司 App** | 各家自己的保單查詢 | 跨公司整合、跨平台 | 跨公司 + 跨家人 |
+| **保險業務員 Excel** | 業務員管理客戶保單 | 個人保險資料夾 | 純消費者工具 |
+| **健保快易通 App** | 健保資料查詢 | 健保（非商業保險） | 商業保險 |
+
+### §1.4 商業目標 (KPIs / OKRs)
+
+**3 個月 MVP 驗證目標**：
+- **O1**：驗證「個人保險資料夾」是否被使用
+  - KR1：50 位種子用戶（已購保者 LINE 群組招募），30 日留存 ≥ 25%
+  - KR2：平均每位用戶新增保單 ≥ 3 張
+  - KR3：保單到期提醒開啟率 ≥ 50%
+
+- **O2**：驗證付費意願
+  - KR1：50 用戶中願意 NT$99/月訂閱 Premium（家庭資料夾 + 無限保單）≥ 5 人（10% 付費率）
+  - KR2：若 < 3 人，停止 Premium 開發，純免費 + 廣告
+
+- **O3**：建立社群
+  - KR1：LINE 社群「保險自己管」30 天內成員 ≥ 300
+
+### §1.5 ⭐ Non-Goals（明確不做）
+
+| 不做 | 理由 | 替代方案 |
 |---|---|---|
-| **3 個月** | MAU | 50,000 |
-| **6 個月** | 付費轉化率 | 1.5%（750 付費） |
-| **6 個月** | MRR | NT$380,000 |
-| **12 個月** | MRR | NT$1,500,000 |
-| **12 個月** | GitHub stars | 500 |
-
-### 1.5 Non-Goals (明確不做)
-
-- ❌ **不做保險業務員導流** — 與「中立比較」定位衝突；保戶不信任含導流內容
-- ❌ **不串接金管會 API** — 目前金管會無開放保單資料查詢 API，預載資料採手動維護
-- ❌ **不做後端** — 個資保護優先，所有資料本地儲存（localStorage）
-- ❌ **不做 OCR 拍照辨識保單** — v1 不做（OCR 準確率 <80% 易誤導），v3+ 評估
-- ❌ **不做「推薦買哪家」功能** — 法律風險 + 立場衝突，本工具定位「資訊整理」非「保險建議」
-- ❌ **不做 IG/TikTok 等社群經營** — 與保險專業內容無關
+| 保險比較 / 銷售導購 | Finfo/MY83 已佔滿；金管會監管 | 引流到 Finfo（聯盟行銷？v3 評估） |
+| 業務員媒合 / 招攬 | 金管會監管，需業務員證 | 不做（避免法律風險） |
+| 保險商品評論 / UGC | Finfo/MY83 已有 | 引流 |
+| 保險理財建議 | 需金管會核准 | 純資訊揭露，不做建議 |
+| 跨境保險 | 微型個體戶 LTV 低 | 不做 |
+| 多國幣別 | 純台幣保單 | 不做 |
+| 雲端同步（v1） | localStorage 為 MVP | v2 Premium 才有 |
+| **🟡 甜蜜點存在但金管會風險需評估** | Sweet Spot = 5，需先 §11 訪談 + 法務 review | v1 上線前完成驗證與法務 |
 
 ---
 
-## 2. 使用者場景與流程
+## §2 使用者場景與流程
 
-### 2.1 使用者流程圖
+### §2.1 使用者流程圖
+
+```mermaid
+graph TD
+    A[進入首頁] --> B[新增第一張保單]
+    B --> C{有紙本?}
+    C -->|是| D[QR Code 掃描保單條碼]
+    C -->|否| E[手動輸入保單資料]
+    D --> F[OCR 自動帶入]
+    E --> F
+    F --> G[儲存到「我的保險」]
+    G --> H[顯示保單列表 + 到期日]
+    H --> I{需要理賠?}
+    I -->|是| J[選擇理賠類型]
+    J --> K[SOP 引導：準備哪些文件]
+    K --> L[OCR 掃描診斷書]
+    L --> M[自動產出理賠申請書草稿]
+    M --> N[下載 PDF / 列印]
+    I -->|否| O[結束]
+```
+
+### §2.2 關鍵用戶故事 (User Stories)
+
+| ID | 角色 | 想要 | 為了 | 優先 |
+|---|---|---|---|---|
+| US-01 | 已購保者 | 掃描保單條碼建檔 | 不用手動輸入 | P0 |
+| US-02 | 已購保者 | 集中查看所有保單 | 找保單時不用翻紙本 | P0 |
+| US-03 | 已購保者 | 收到保單到期提醒 | 不會忘記續保 | P0 |
+| US-04 | 出險者 | 理賠流程 SOP 引導 | 知道要準備什麼文件 | P1 |
+| US-05 | 業務員 | 客戶保單資料夾（B2B） | 服務 100+ 客戶 | P2 |
+| US-06 | 用戶 | 管理全家人保單 | 父母/小孩/配偶 | P2 |
+
+### §2.3 邊界場景 (Edge Cases)
+
+| 場景 | 處理 |
+|---|---|
+| QR Code 掃不出來（保單無條碼） | 提示「手動輸入」並提供欄位 |
+| OCR 辨識失敗 | 提供「重新拍攝」按鈕，最多 3 次 |
+| 用戶新增保單 > 5 張（免費版上限） | 提示升級 Premium |
+| 跨公司保單（多家保險公司） | 完全支援，每張保單獨立標籤 |
+| 保單到期已過 | 紅色標籤「已過期，請確認是否續保」 |
+| 網路斷線 | localStorage 已快取，全部功能可用 |
+| 家人資料夾（Premium） | v2 才做 |
+
+---
+
+## §3 功能性需求
+
+### §3.1 MVP（必做，P0）— Sweet-Spot-Driven 重新定義
+
+> **重新定義**：原 v1 規劃「保險比較 + 業務員媒合」；sweet spot 分析指出是 Finfo/MY83 紅海 + 金管會監管。
+> **新 MVP 只做 3 件事**：① 個人保險資料夾 ② QR 掃描建檔 ③ 理賠 SOP
+
+| ID | 功能 | 細節 | 預估工時 |
+|---|---|---|---|
+| F-M1 | **手動新增保單** | 10 欄位（保險公司/保單號/險種/被保人/保額/保費/起保日/到期日/繳費方式/備註） | 16h |
+| F-M2 | **QR Code 條碼掃描** | 用 html5-qrcode 掃保單條碼，自動帶入 | 12h |
+| F-M3 | **OCR 自動建檔** | 用 Tesseract.js 掃描保單圖片，自動辨識關鍵欄位 | 20h |
+| F-M4 | **保單列表** | 卡片式 UI，顯示公司/險種/到期日 | 8h |
+| F-M5 | **到期提醒** | localStorage 排程檢查，到期前 30/7/1 天推播（瀏覽器原生 Notification API） | 12h |
+| F-M6 | **理賠 SOP 模板** | 5 種常見理賠（醫療/意外/身故/失能/住院）的 SOP 引導 | 16h |
+| F-M7 | **PDF 匯出** | 理賠申請書草稿匯出 PDF（含診斷書 OCR 內容） | 10h |
+| F-M8 | **無障礙 + SEO** | Open Graph、a11y | 4h |
+
+**預估總工時：98h（1 人 11 週 part-time）**
+
+**明確不做（v1）**：保險比較、業務員媒合、雲端同步、家庭資料夾、銷售導購。
+
+### §3.2 v2（加值，P1）— 雲端同步 + Premium 變現
+
+驗證 v1 留存 ≥ 25% 後才做：
+- **F-V1**：Supabase 雲端同步
+- **F-V2**：Premium NT$99/月（無限保單 + 家庭資料夾）
+- **F-V3**：業務員 B2B 版（NT$499/月管理 100+ 客戶）
+
+### §3.3 v3（探索，P2）
+
+驗證 v2 付費率 ≥ 10% 後才做：
+- **F-E1**：AI 自動分類（用 OpenAI API）
+- **F-E2**：與保險公司 API 整合（部分公司已開放保單查詢 API）
+- **F-E3**：保險觀念學習遊戲（Finfo/MY83 內容引流）
+- **F-E4**：與會計師/律師協作介面（理賠爭議）
+
+### §3.4 ⭐ Acceptance Criteria (Given/When/Then) — 至少 10 條
+
+```
+AC-01: Given 用戶首次進入, When 點「新增保單」, Then 顯示 10 欄位表單
+AC-02: Given 用戶點「掃描條碼」, When QR Code 對準保單, Then 2 秒內自動帶入保單號
+AC-03: Given 用戶拍攝保單圖片, When OCR 完成, Then 自動帶入「保險公司/險種/保額」3 欄位
+AC-04: Given 用戶新增保單成功, When 查看列表, Then 1 秒內顯示卡片
+AC-05: Given 用戶的保單將於 7 天後到期, When 開啟應用, Then 顯示到期提醒
+AC-06: Given 用戶想理賠, When 選擇「醫療理賠」, Then 顯示 SOP（5 步驟 + 所需文件清單）
+AC-07: Given 用戶掃描診斷書, When OCR 完成, Then 自動產出理賠申請書 PDF
+AC-08: Given 用戶是回訪者, When 開啟頁面, Then < 1.5 秒載入
+AC-09: Given 用戶使用螢幕閱讀器, When 操作時, Then 每欄位都有 aria-label
+AC-10: Given 用戶離線, When 進入, Then 仍可使用 localStorage 快取資料
+AC-11: Given 用戶新增保單 > 5 張, When 嘗試新增第 6 張, Then 提示升級 Premium
+AC-12: Given Lighthouse CI, When 跑分, Then Performance ≥ 90, Accessibility ≥ 95, SEO ≥ 90, BP ≥ 90
+```
+
+---
+
+## §4 系統設計
+
+### §4.1 技術棧
+
+| 層 | 選擇 | 理由 |
+|---|---|---|
+| 前端框架 | **Next.js 14 (App Router) + React 18 + TypeScript** | 既有專案一致 |
+| 樣式 | **Tailwind CSS + shadcn/ui** | 開發快、a11y 好 |
+| 狀態 | **Zustand** | 輕量、localStorage 整合簡單 |
+| QR Code 掃描 | **html5-qrcode** | 純前端、零成本 |
+| OCR | **Tesseract.js** | 純前端、繁中辨識率 ~80% |
+| PDF | **jsPDF** | 純前端、零成本 |
+| 推播 | **瀏覽器原生 Notification API** | 零成本、需使用者授權 |
+| 後端（v2） | **Supabase** | 開源、PostgreSQL |
+| 部署 | **Vercel** | 免費層、CDN |
+| 分析 | **Plausible Analytics** | 隱私友善 |
+| 測試 | **Vitest + Playwright** | E2E 必備 |
+| CI | **GitHub Actions** | 跑 Lighthouse + test |
+
+**明確不引入**：保險公司 API（金管會監管）、業務員媒合（金管會業務員證）、AI/LLM。
+
+### §4.2 系統架構圖
 
 ```mermaid
 graph LR
-    A[進入首頁] --> B[瀏覽保險地圖]
-    B --> C{選擇功能}
-    C -->|保單管理| D[新增/編輯保單<br/>localStorage]
-    C -->|條款比較| E[選 2-4 張保單<br/>並排比較]
-    C -->|理賠 SOP| F[選險種<br/>step-by-step]
-    D --> G[儀表板<br/>到期提醒]
-    E --> H[差異高亮<br/>best/worst]
-    F --> I[check box 追蹤<br/>預估工作天]
-    G --> J[匯出 JSON 備份]
+    U[User Browser] -->|HTTPS| V[Vercel CDN]
+    V -->|靜態檔| S[Static Assets]
+    V -->|SSR/SSG| N[Next.js Pages]
+    N -->|localStorage| LS[Browser Storage]
+    U -->|QR 掃描| QR[html5-qrcode]
+    U -->|OCR| OC[Tesseract.js]
+    U -->|PDF 產生| PD[jsPDF]
+    U -->|瀏覽器推播| NTF[Notification API]
+    V -.->|v2 雲端同步| SB[Supabase]
+    SB -->|Postgres| DB[(PostgreSQL)]
+    SB -->|Auth| AU[Supabase Auth]
+    N -.->|Plausible| P[Plausible.io]
 ```
 
-### 2.2 關鍵用戶故事 (User Stories)
+### §4.3 資料模型（localStorage Schema）
 
-**US-001：保單集中管理**
-> As a 一般保戶  
-> I want to 在瀏覽器新增 3 張保單（國泰人壽+富邦產險+南山醫療險）  
-> So that 系統自動彙整總保障額度 NT$1,500 萬、年繳保費 NT$48,000、到期提醒
+```typescript
+type InsuranceType = 'life' | 'medical' | 'accident' | 'disability' | 'annuity' | 'other';
 
-**US-002：條款並排比較**
-> As a 準備買新醫療險的保戶  
-> I want to 選 2 張醫療險並排比較（住院日額、癌症一次金、等待期）  
-> So that 系統自動高亮差異（紅/綠）並顯示「這張在 X 項目優於其他」
+interface Policy {
+  id: string;            // UUID
+  insuranceCompany: string;  // '國泰人壽', '富邦人壽', ...
+  policyNumber: string;
+  type: InsuranceType;
+  insuredPerson: string;  // 被保險人姓名
+  coverage: number;       // 保額 NT$
+  premium: number;        // 年保費 NT$
+  startDate: string;
+  endDate: string;
+  paymentFrequency: 'yearly' | 'monthly' | 'quarterly' | 'one-time';
+  notes?: string;
+  photoUrl?: string;      // 保單照片（OCR 用）
+  createdAt: string;
+  updatedAt: string;
+}
 
-**US-003：理賠 SOP step-by-step**
-> As a 出險住院的保戶  
-> I want to 點擊「住院理賠 SOP」並依序完成 T+0 通報 → T+3 文件 → T+7 送件 → T+14 核付  
-> So that 我能跟蹤進度，且不漏掉必備文件
+interface ClaimDraft {
+  id: string;
+  policyId: string;       // 關聯保單
+  claimType: 'medical' | 'accident' | 'death' | 'disability' | 'hospitalization';
+  diagnosisText?: string;  // OCR 辨識結果
+  documentsChecked: string[];  // SOP 步驟勾選
+  pdfGeneratedAt?: string;
+  status: 'draft' | 'submitted' | 'paid' | 'rejected';
+  createdAt: string;
+}
 
-**US-004：銀髮族子女代管**
-> As a 50 歲的子女  
-> I want to 為 80 歲父母建立保單資料（標記「代父母管理」），並列印紙本清單  
-> So that 我能回家確認父母的保障，避免出險時才發現漏保
+interface UserPreferences {
+  reminderDays: number[];   // [30, 7, 1] 預設
+  notificationEnabled: boolean;
+}
 
-**US-005：保險經紀人客戶管理**
-> As a 保險經紀人  
-> I want to 一次性管理 50 位客戶保單，產生客製化比較報表 PDF  
-> So that 我能在客戶會議上即時展示條款差異，提高成交率
+interface Store {
+  policies: Policy[];      // 免費版最多 5 張
+  claimDrafts: ClaimDraft[];
+  preferences: UserPreferences;
+}
 
-### 2.3 邊界場景 (Edge Cases)
+// localStorage keys
+// 'insurance:store' -> Store
+```
 
-- **30 天內到期保單**：儀表板紅色標示 + email 提醒（如未登入則 browser notification）
-- **保單資料完整性**：必填欄位（保險公司、保單號碼、險種、保額）若缺漏，UI 顯示警告但不擋儲存
-- **條款資料過期**：每筆條款標註「資料更新日期」+ 免責聲明
-- **跨瀏覽器同步**：localStorage 跨瀏覽器不互通，提供 JSON 匯出/匯入備份機制
-- **公用電腦使用**：UI 明顯提示「資料儲存在此裝置，清除瀏覽器資料將遺失」
+### §4.4 API 規格（v1 最小化，v2 加 Supabase）
 
----
+v1 完全不需要後端 API。
 
-## 3. 功能性需求 (Functional Requirements)
-
-### 3.1 MVP（必做，P0）
-
-- [ ] **F-001 保單 CRUD**（Given 使用者在保單頁，When 新增/編輯/刪除保單，Then 資料寫入 localStorage 且立即更新儀表板）
-- [ ] **F-002 自動分類**（Given 保單資料，When 輸入險種，Then 自動歸類：壽險/醫療險/意外險/癌症險/住院日額/長照/失能/旅平險/車險/產險）
-- [ ] **F-003 到期提醒儀表板**（Given 30 天內到期保單，When 開啟首頁，Then 紅色標示且顯示「剩餘 X 天」）
-- [ ] **F-004 JSON 備份**（Given 使用者點擊匯出，When 下載，Then 瀏覽器下載完整保單 JSON）
-- [ ] **F-005 一鍵列印**（Given 點擊列印，When 瀏覽器列印對話框，Then 顯示「保單清單」列印版）
-- [ ] **F-006 條款比較矩陣**（Given 2-4 張保單，When 並排比較，Then 顯示差異欄位（住院日額/癌症一次金/等待期/除外責任）並高亮 best/worst）
-- [ ] **F-007 30 家保險公司預載資料**（Given 首次進入，When 開啟比較頁，Then 預載金管會公開條款資料）
-- [ ] **F-008 6 種險種 SOP**（Given 點擊任一險種，When 開啟 SOP，Then 顯示 T+0/T+3/T+7/T+14 階段 + check box）
-- [ ] **F-009 保險地圖**（Given 開啟地圖頁，When 載入，Then 顯示 30 家公司總部位置 + 業務密度 + 申訴率）
-- [ ] **F-010 RWD + 深色模式**（Given 三斷點（375/768/1440）+ 深色模式切換，When 操作，Then 正常使用）
-
-### 3.2 v2.0 B2B 經紀人版（加值，P1）
-
-- [ ] **F-011 經紀人客戶管理**（管理 50 位客戶保單 + 標籤分組）
-- [ ] **F-012 客製化比較報表 PDF**（經紀人選擇客戶保單 → 自動產生含 Logo 的 PDF）
-- [ ] **F-013 客戶白牌版本**（經紀人可建立 white-label 連結給客戶）
-- [ ] **F-014 多家庭成員切換**（父母/子女/配偶切換保單群組）
-- [ ] **F-015 條款資料自動更新提醒**（每季新公告 → 通知經紀人檢視更新）
-- [ ] **F-016 理賠權益試算**（輸入自付額 → 試算可申請金額）
-
-### 3.3 v3.0（願景，P2）
-
-- [ ] **F-017 OCR 拍照辨識紙本保單**（GPT-4o vision API）
-- [ ] **F-018 AI 推薦引擎**（依使用者年齡/收入/家庭狀況建議險種組合）
-- [ ] **F-019 與保險經紀人協作模式**（選擇性 share 部分保單）
-- [ ] **F-020 Telegram/LINE Bot 整合**（出險時 LINE Bot 自動推 SOP）
-
-### 3.4 Acceptance Criteria (Given/When/Then)
-
-**AC-001（保單 CRUD）**
-> Given 使用者在保單頁  
-> When 新增保單（保險公司=國泰人壽、保單號碼=ABC123、險種=醫療險、保額=NT$100 萬）  
-> Then localStorage 寫入 1 筆保單，且儀表板立即顯示「總保障 NT$100 萬」
-
-**AC-002（自動分類）**
-> Given 使用者輸入險種「醫療險」  
-> When 點擊儲存  
-> Then 保單自動歸類為「醫療險」分類，且儀表板醫療險分類顯示「1 張」
-
-**AC-003（30 天內到期提醒）**
-> Given 某保單到期日為 2026-08-01（今天 2026-07-03）  
-> When 開啟首頁  
-> Then 該保單在儀表板紅色標示「剩餘 28 天到期」
-
-**AC-004（JSON 匯出匯入）**
-> Given 使用者有 5 張保單  
-> When 點擊「匯出 JSON」  
-> Then 下載 `policies-2026-07-11.json` 含 5 筆保單完整資料
-
-**AC-005（條款比較）**
-> Given 使用者選 2 張醫療險（A 公司 + B 公司）  
-> When 點擊「並排比較」  
-> Then 顯示 7 個欄位（住院日額、癌症一次金、等待期、除外責任等）並對差異高亮（紅=差、綠=優）
-
-**AC-006（理賠 SOP）**
-> Given 使用者點擊「住院理賠 SOP」  
-> When 開啟頁面  
-> Then 顯示 4 階段：T+0 通報（電話保險公司）、T+3 文件（診斷書+收據）、T+7 送件（紙本/線上）、T+14~30 核付（匯款帳戶），每階段可勾選
-
-**AC-007（保險地圖）**
-> Given 開啟保險地圖頁  
-> When 載入完成  
-> Then 顯示全台 30 家保險公司總部位置（marker）+ 業務密度熱區 + 申訴率高低
-
-**AC-008（深色模式）**
-> Given 使用者點擊右上「深色模式」按鈕  
-> When 切換  
-> Then 整站從淺色切換到深色（背景 #1a1a1a、文字 #fafafa），且 localStorage 記住偏好
-
-**AC-009（公用電腦警告）**
-> Given 使用者在公用電腦（user agent 含「Kiosk」或 IP 為公開 WiFi）  
-> When 首次進入  
-> Then UI 顯示黃色警告橫幅「此裝置資料將被清除，建議匯出 JSON 備份」
-
-**AC-010（30 家預載資料）**
-> Given 首次進入比較頁  
-> When 載入條款資料  
-> Then 從 `/data/companies.json` 載入 30 家公司（每家含名稱、總部、申訴率、條款連結），無重複或缺漏
+v2 預留：
+- `POST /api/policies`：雲端同步
+- `GET /api/policies`：跨裝置讀取
 
 ---
 
-## 4. 系統設計 (System Design)
+## §5 非功能性需求
 
-### 4.1 技術棧 (Tech Stack)
+### §5.1 性能指標
 
-| 層 | 技術 | 理由 |
+| 指標 | 目標 | 量測 |
 |---|---|---|
-| 前端 | React 18 + Vite + TypeScript | 純 SPA、bundle 小、開發快 |
-| 路由 | React Router v6 | SPA 多頁面導航（保單/對比/理賠/地圖） |
-| 狀態管理 | Zustand | 比 Redux 輕量，適合純前端本地狀態 |
-| 樣式 | Tailwind CSS + Headless UI | 快速 RWD、無障礙組件支援 |
-| 資料儲存 | localStorage（含 IndexedDB 備援） | 純前端、零後端、個資不外流 |
-| 圖表 | Recharts | 保險地圖、儀表板圖表 |
-| 地圖 | Leaflet + OpenStreetMap | 免費、開源、保險公司總部位置 |
-| PDF 產生 | jsPDF + html2canvas | 經紀人客戶報表 |
-| 預載資料 | 靜態 JSON (`/public/data/companies.json`) | 30 家公司條款資料 |
-| 部署 | Vercel | 自動 CI/CD、全球 CDN、免費 HTTPS |
-| 版本控制 | GitHub | 公開原始碼、利於社群協作 |
-| 程式碼品質 | ESLint + Prettier | 一致風格 |
+| LCP | < 1.5 秒 | Lighthouse |
+| FID | < 100 毫秒 | Lighthouse |
+| CLS | < 0.1 | Lighthouse |
+| OCR 辨識時間 | < 5 秒（單張圖片） | 手動測試 |
+| QR Code 掃描時間 | < 2 秒 | 手動測試 |
+| PDF 產生時間 | < 2 秒 | 手動測試 |
+| Bundle size | < 250 KB gzipped | `next build`（Tesseract.js worker 需另外 lazy load） |
 
-### 4.2 系統架構圖 (Mermaid)
+### §5.2 安全與隱私
 
-```mermaid
-graph TB
-    subgraph Browser
-        SPA[React 18 SPA<br/>+ Zustand]
-        LocalStorage[(localStorage<br/>保單資料)]
-        IndexedDB[(IndexedDB<br/>備援)]
-    end
-    
-    subgraph Static[Static Assets on Vercel CDN]
-        HTML[HTML/CSS/JS Bundle]
-        CompaniesJSON[/data/companies.json<br/>30家預載/]
-        MapTiles[OSM Map Tiles]
-    end
-    
-    subgraph External
-        KmgInfo[金管會公開資料<br/>每季更新]
-        ROCData[保發中心<br/>申訴率統計]
-    end
-    
-    SPA --> LocalStorage
-    SPA --> IndexedDB
-    SPA --> HTML
-    SPA --> CompaniesJSON
-    SPA --> MapTiles
-    CompaniesJSON -.每季更新.-> KmgInfo
-    CompaniesJSON -.每月更新.-> ROCData
-```
+- **敏感個資**：保單含身份證字號、電話、地址 — v1 完全 localStorage；v2 Supabase 加密
+- **無第三方資料共享**：不與保險公司、保險業務員共享
+- **無追蹤 cookie**：Plausible
+- **免責聲明**：「本工具為個人保單管理輔助，非保險業務或招攬行為」
+- **金管會合規**：純資訊管理工具，不做比較、不做媒合、不做銷售 — 完全避開業務員證需求
 
-### 4.3 資料模型 (Prisma schema)
+### §5.3 ⭐ 降級機制 (Graceful Degradation)
 
-```prisma
-// 純前端 IndexedDB schema (Prisma 對照版)
-model Policy {
-  id              String   @id @default(uuid())
-  userId          String   // localStorage key (per browser)
-  companyId       String   // FK -> Company
-  company         Company  @relation(fields: [companyId], references: [id])
-  policyNumber    String
-  insuranceType   String   // life/medical/accident/cancer/hospital/longterm/disability/travel/auto/property
-  insuredName     String
-  applicantName   String
-  coverageAmount  Decimal
-  annualPremium   Decimal
-  paymentPeriod   Int?     // 繳費期間（年）
-  coveragePeriod  Int?     // 保障期間（年）
-  isAutoRenew     Boolean  @default(false)
-  contractStart   DateTime
-  contractEnd     DateTime?
-  notes           String?  @db.Text
-  isManagedForFamily Boolean @default(false) // 為家人代管
-  familyMemberName String?
-  createdAt       DateTime @default(now())
-  updatedAt       DateTime @updatedAt
-  
-  @@index([userId, insuranceType])
-  @@index([contractEnd])
-}
-
-model Company {
-  id              String   @id @default(uuid())
-  name            String   @unique
-  shortName       String
-  headquarters    String
-  latitude        Float
-  longitude       Float
-  complaintRate   Float    // 申訴率（每萬件）
-  totalPolicies   Int      // 業務量（萬件）
-  foundedYear     Int
-  contactPhone    String
-  websiteUrl      String
-  termsUrl        String
-  lastUpdated     DateTime
-  policies        Policy[]
-}
-
-model ClaimWorkflow {
-  id              String   @id @default(uuid())
-  userId          String
-  insuranceType   String   // 住院/手術/癌症/失能/身故/意外
-  policyId        String?  // 關聯保單
-  currentStage    String   // reported/documenting/submitting/paid
-  reportedAt      DateTime?
-  documentReadyAt DateTime?
-  submittedAt     DateTime?
-  paidAt          DateTime?
-  documents       String[] // ["診斷書", "收據", "..."
-  notes           String?  @db.Text
-  
-  @@index([userId, insuranceType])
-}
-
-model ClaimChecklist {
-  id              String   @id @default(uuid())
-  workflowId      String
-  workflow        ClaimWorkflow @relation(fields: [workflowId], references: [id])
-  stage           String   // reported/documenting/submitting/paid
-  item            String
-  isCompleted     Boolean  @default(false)
-  completedAt     DateTime?
-}
-
-model ComparisonSession {
-  id              String   @id @default(uuid())
-  userId          String
-  policyIds       String[] // 2-4 張保單
-  result          Json     // 比較結果（含差異標記）
-  createdAt       DateTime @default(now())
-}
-
-model FamilyMember {
-  id              String   @id @default(uuid())
-  userId          String
-  name            String
-  relation        String   // self/spouse/child/parent/sibling
-  birthYear       Int
-  policyIds       String[] // 關聯保單
-  
-  @@index([userId])
-}
-```
-
-### 4.4 API 規格 (REST endpoints)
-
-| Method | Path | Auth | 用途 |
-|---|---|---|---|
-| GET | /data/companies.json | Optional | 30 家保險公司預載資料 |
-| POST | /api/export/policies | Optional | 匯出 JSON（前端產生，這是 mock） |
-| POST | /api/import/policies | Optional | 匯入 JSON（前端處理，這是 mock） |
-| POST | /api/agent/white-label | Required | 經紀人 white-label 連結產生 |
-| GET | /api/agent/clients/:id | Required | 經紀人查詢客戶保單 |
-| POST | /api/agent/reports/pdf | Required | 經紀人客製化比較報表 PDF |
-| POST | /api/stripe/checkout | Required | Stripe Checkout 訂閱（B2B 經紀人版） |
-| POST | /api/stripe/webhook | Required | Stripe webhook 接收 |
-| GET | /api/companies/:id/complaints | Required | 查詢申訴率（v2 從金管會同步） |
-| GET | /api/news/insurance-updates | Optional | 金管會最新公告 RSS |
-
----
-
-## 5. 非功能性需求 (Non-Functional Requirements)
-
-### 5.1 性能指標
-
-| 指標 | 目標 |
+| 失敗情境 | 降級方案 |
 |---|---|
-| 首頁載入 P95 | ≤ 2 秒 |
-| 保單新增/編輯 localStorage 寫入 | ≤ 100ms |
-| 條款比較矩陣渲染（4 張保單） | ≤ 1 秒 |
-| 6 種 SOP 頁面切換 | ≤ 500ms |
-| 地圖 30 個 marker 渲染 | ≤ 3 秒 |
-| Lighthouse 行動版 | ≥ 85 |
-| 並發用戶 | 10,000 MAU |
+| Vercel CDN 掛了 | GitHub Pages 備援 |
+| OCR 辨識失敗 | 純手動輸入表單 |
+| QR Code 掃不出 | 純手動輸入 |
+| 瀏覽器不支援 Notification API | 站內紅點提醒 |
+| Tesseract.js worker 載入失敗 | 純手動輸入 |
+| PDF 產生失敗 | 提供純文字版本下載 |
+| Plausible 無法連線 | 無損 |
 
-### 5.2 安全與隱私
+### §5.4 擴展性
 
-- **零後端 + localStorage**：個資 100% 在使用者瀏覽器
-- **無 Cookie 追蹤**：除 Vercel Analytics 外不使用第三方追蹤
-- **無第三方 OAuth**：不串接 Google/Facebook 登入
-- **免責聲明固定顯示**：首頁 + 條款頁頂部固定顯示「本工具定位為資訊整理，非保險建議」
-- **HTTPS 強制**：Vercel 自動 + HSTS
-- **30 家預載資料來源公開**：每筆條款標註來源（金管會/保發中心/公司官網）
+- 保險公司列表採 enum，未來加新公司不需改 schema
+- 理賠 SOP 採 JSON 配置，新增 SOP 類型不需改程式
+- OCR 結果欄位映射可設定，未來支援更多保險公司格式
 
-### 5.3 降級機制 (Graceful Degradation)
+---
 
-| 失敗服務 | 掛掉情境 | 降級行為（切換到）| 用戶感受 |
+## §6 完成標準 (Definition of Done)
+
+### §6.1 v1 MVP DoD
+
+- [ ] GitHub Repo 公開（已）
+- [ ] Vercel production URL 200 OK
+- [ ] 8 個功能（F-M1~F-M8）皆可運作且通過 AC-01~AC-12
+- [ ] Lighthouse Performance ≥ 90, A11y ≥ 95, SEO ≥ 90, BP ≥ 90
+- [ ] Vitest 覆蓋率 ≥ 70%
+- [ ] Playwright E2E 至少 5 個關鍵流程（含 QR 掃描、OCR）
+- [ ] 隱私頁 + 免責聲明 + 金管會合規說明 完成
+- [ ] 50 人 Beta 測試（已購保者招募）
+
+---
+
+## §7 風險與決策
+
+### §7.1 風險表
+
+| ID | 風險 | 等級 | 緩解策略 |
 |---|---|---|---|
-| localStorage 滿載 | 5MB 上限掛掉 | 切換到 IndexedDB 備援（瀏覽器支援） | 自動備援，使用者無感 |
-| IndexedDB 不支援 | Safari 隱私模式掛掉 | 切換到 sessionStorage（單次 session） | 提示「資料僅本次 session 保留」 |
-| Vercel CDN 掛掉 | 靜態資源 5xx 掛掉 | 切換到 Cloudflare Pages 鏡像 | 載入延遲 ≤5 秒 |
-| OpenStreetMap 圖磚 | OSM 服務掛掉 | 切換 CartoDB/Stamen 圖磚 | 地圖仍可用 |
-| Recharts 渲染 | 圖表 JS 5xx 掛掉 | 切換到純 HTML 表格 fallback | 圖表變表格，功能仍可用 |
-| jsPDF 客戶端 | 不支援 掛掉 | fallback 下載純文字 checklist | 部分用戶無法匯出 PDF |
-| 金管會 RSS 變動 | RSS 格式變更 掛掉 | 切換到保發中心 RSS | 最新公告延遲 ≤1 天 |
-| Stripe webhook | Webhook 5xx 掛掉 | 本地排程每 5 分鐘 reconcile | 訂閱狀態延遲 ≤15 分鐘 |
-| 公用電腦（user agent 異常） | 偵測到 Kiosk 模式 掛掉 | 切換到「強制匯出」模式 | UI 顯示警告 |
+| R-01 | Finfo/MY83 已佔保險比較 | 🟠 中 | 完全不做比較，鎖定「個人資料夾」甜蜜點 |
+| R-02 | 金管會監管風險 | 🔴 高 | 純資訊管理工具，不做招攬/比較/媒合；明確標示 |
+| R-03 | OCR 繁中辨識率低 | 🟠 中 | Tesseract.js + 人工校對，辨識率 < 80% 時引導手動 |
+| R-04 | B2C 月訂閱付費意願弱 | 🟡 低 | NT$99/月低價 + 家庭資料夾是殺手級功能 |
+| R-05 | 保單個資外洩 | 🟠 中 | v1 純 localStorage，v2 Supabase 加密 + RLS |
+| R-06 | 與保險公司 App 重疊 | 🟡 低 | 跨公司 + 跨家人 是甜蜜點 |
+| R-07 | Sweet Spot = 5，需先驗證 | 🟡 低 | §11 訪談 30 人 + 法務 review |
 
-### 5.4 擴展性
+### §7.2 ⭐ ADR (Architecture Decision Records) — 至少 3 條
 
-- **靜態資源 CDN**：Vercel Edge Network 全球 280+ 節點
-- **資料分區**：localStorage 依 userId（瀏覽器指紋）分區
-- **IndexedDB 升級**：當資料 >5MB 時自動切換
-- **30 家預載資料**：每季更新，由 Sean 手動 commit 新 JSON
+#### ADR-001：完全放棄「保險比較 + 業務員媒合」紅海
+
+- **狀態**：Accepted（2026-07-19）
+- **背景**：Finfo 月活躍 80 萬、MY83 月活躍 50 萬，皆主打保險比較 + 內容 + 業務員媒合
+- **決策**：v1 完全不做比較、不做媒合、不做銷售；只做「已購保單管理 + 理賠 SOP」
+- **理由**：
+  1. Finfo/MY83 已佔滿比較紅海
+  2. 金管會監管「業務員招攬行為」需業務員證，一人公司無法取得
+  3. 「個人保險資料夾」是甜蜜點：保險公司各自 App 不互通、保險業務員 Excel 不對消費者開放
+- **後果**：
+  - 正面：完全避開金管會監管、開發範圍縮減 50%
+  - 負面：放棄「比較 + 媒合」高變現場景
+- **替代方案被拒絕**：
+  - 「做 Finfo 差異化比較」→ 已是紅海
+  - 「做業務員媒合」→ 需業務員證，金管會監管
+
+#### ADR-002：OCR 用 Tesseract.js 純前端，不用雲端 API
+
+- **狀態**：Accepted
+- **決策**：OCR 用 Tesseract.js 純前端辨識（繁中 ~80% 辨識率），不用 Google Vision 等雲端 API
+- **理由**：
+  1. 保單含敏感個資（身份證、地址），送雲端有隱私風險
+  2. Tesseract.js 純前端、零成本、零資料外洩
+  3. 80% 辨識率 + 人工校對已堪用
+- **後果**：失去辨識精度但獲得隱私與成本優勢
+
+#### ADR-003：v1 完全 localStorage，雲端同步留到 v2
+
+- **狀態**：Accepted
+- **決策**：v1 完全 localStorage；v2 加 Supabase 雲端同步作為 Premium NT$99/月差異化
+- **理由**：
+  1. 雲端後端是開發成本大魔王
+  2. 雲端同步 + 家庭資料夾是付費意願的「殺手級功能」
+  3. localStorage 在單人使用場景已堪用
+- **後果**：放棄「多裝置即時同步」但獲得開發速度
+
+#### ADR-004：免費版上限 5 張保單，Premium 無限
+
+- **狀態**：Accepted
+- **決策**：免費版最多 5 張保單，Premium NT$99/月無限 + 家庭資料夾
+- **理由**：
+  1. 5 張保單已覆蓋 70%+ 個人用戶（個人平均 3-5 張）
+  2. 「家庭資料夾」是付費轉換的殺手級功能（5+ 家人保單）
+  3. 「無限保單」對保險業務員 B2B 版（v2）也是關鍵
+- **後果**：免費版足以驗證需求，付費版有明確差異化
 
 ---
 
-## 6. 完成標準 (Definition of Done)
+## §8 里程碑與 Sprint 拆解
 
-### 6.1 v1 MVP DoD
+### §8.1 里程碑總覽
 
-- [ ] Vercel production URL（https://insurance-hub-one.vercel.app/）200 OK
-- [ ] GitHub Repo 公開
-- [ ] 30 家保險公司預載資料完整（含公司名、總部、申訴率、公開條款）
-- [ ] 保單新增/編輯/刪除/查詢 4 項功能全通
-- [ ] 條款對比矩陣可同時比較 2-4 張保單，差異高亮正確
-- [ ] 6 種險種 SOP 頁面皆上線，check box 狀態可持久化
-- [ ] Vercel 部署成功，網址可公開訪問
-- [ ] Lighthouse 行動版分數 ≥85
-- [ ] 所有頁面繁體中文，無英文未翻譯字串
-- [ ] 10 條 AC 單元測試全綠
-- [ ] JSON 匯出/匯入機制驗證
-
-### 6.2 v2 B2B 經紀人版 DoD
-
-- [ ] Supabase Auth 整合（magic link）
-- [ ] 經紀人客戶管理（50 位）
-- [ ] 客製化比較報表 PDF
-- [ ] white-label 連結產生
-- [ ] 多家庭成員切換
-- [ ] Stripe Checkout 訂閱流程
-- [ ] 客服頁 + 法律頁上線
-
----
-
-## 7. 風險與決策
-
-### 7.1 風險表
-
-| 風險 | 等級 | 緩解策略 |
+| 里程碑 | 日期 | DoD |
 |---|---|---|
-| 個資在公用電腦外洩 | 🟠 中 | UI 明顯警告 + 強制匯出備份機制 |
-| 條款資料過期造成誤導 | 🟠 中 | 免責聲明 + 資料更新日期標註 + 定期更新 |
-| 法律責任風險（使用者決策受損） | 🟡 低 | 明確「資訊整理」定位 + 免責聲明固定顯示 |
-| 業務員導流衝突 | 🟡 低 | 初期不做導流；若未來考慮須明確標示業配 |
-| 30 家預載資料維護成本 | 🟠 中 | 開源 GitHub 接受社群 PR + 資料更新 checklist |
-| 保險公司官網改版導致條款連結失效 | 🟡 低 | 監控連結存活 + 定期重新整理 |
-| OCR 拍照辨識準確率 | 🟠 中 | v1 不做；v3 評估 GPT-4o vision API |
-| 金管會 RSS 格式變更 | 🟡 低 | 多源 fallback（金管會/保發中心/公司官網） |
+| **M0：驗證階段** | 2026-07-19 → 2026-08-25 | 完成 §11 訪談 30 人 + 法務 review + LP 1 則 + LINE 社群建置 |
+| **M1：v1 MVP** | 2026-08-26 → 2026-11-30 | 8 個功能完成 + Lighthouse 達標 + 50 人 Beta |
+| **M2：v2 加值** | 2026-12-01 → 2027-02-28 | Supabase 雲端同步 + Premium NT$99/月 + 業務員 B2B 版 |
+| **M3：v3 探索** | 2027-03-01 → 2027-05-31 | AI 分類 + 保險公司 API + 學習遊戲 |
 
-### 7.2 ADR (Architecture Decision Records)
+### §8.2 Sprint 拆解（M1 MVP）
 
-### ADR-001：純前端 SPA + localStorage 而非 Next.js 全端
-- **Context**：個資保護優先 + 30 家預載資料靜態化
-- **Decision**：React 18 SPA + localStorage，零後端
-- **Consequences**：✅ 個資 100% 在使用者裝置；✅ 零後端成本；⚠️ 跨裝置不互通（提供 JSON 備份）
-
-### ADR-002：30 家保險公司資料採靜態 JSON 而非 API
-- **Context**：金管會無開放保單資料查詢 API
-- **Decision**：`/data/companies.json` 預載，Sean 手動每季更新
-- **Consequences**：✅ 零 API 成本；⚠️ 需人工維護（透過 GitHub PR 社群協作）
-
-### ADR-003：選擇 Zustand 而非 Redux
-- **Context**：純前端本地狀態管理
-- **Decision**：Zustand（輕量、API 簡潔）
-- **Consequences**：✅ Bundle size 節省 30KB+；✅ 學習曲線低；⚠️ 社群資源少於 Redux
-
-### ADR-004：Leaflet + OpenStreetMap 而非 Google Maps
-- **Context**：地圖 API 成本
-- **Decision**：Leaflet + OSM 圖磚
-- **Consequences**：✅ 零地圖成本；✅ 無 API key；⚠️ 圖磚品質略遜 Google
-
-### ADR-005：JSON 匯出匯入而非雲端同步
-- **Context**：v1 純前端 + 個資保護
-- **Decision**：使用者手動 JSON 匯出/匯入
-- **Consequences**：✅ 零後端；⚠️ 跨裝置不便（v2 經紀人版加 Supabase）
-
-### ADR-006：免責聲明固定顯示而非彈出
-- **Context**：法律風險
-- **Decision**：首頁 + 條款頁頂部固定顯示，非 modal 彈出
-- **Consequences**：✅ 避免使用者關閉免責聲明；✅ 法律保護更明確
-
-### ADR-007：不支援保險業務員導流
-- **Context**：定位衝突
-- **Decision**：永遠不做業務員導流（與「中立比較」定位衝突）
-- **Consequences**：✅ 維持使用者信任；⚠️ 放棄潛在業務員付費營收（但保戶量體更大）
-
----
-
-## 8. 里程碑與 Sprint 拆解
-
-### 8.1 里程碑總覽
-
-| 里程碑 | 時間 | 完成定義 |
+| Sprint | 週次 | 主題 |
 |---|---|---|
-| **M1 規格完成** | 2026-07-11 | v2.2.1 PRD 100% 合規 |
-| **M2 v1 MVP 強化** | 2026-07-30 | 10 條 AC 全綠 + Lighthouse ≥90 + 資料更新機制 |
-| **M3 v2 B2B 經紀人版** | 2026-08-31 | 客戶管理 + PDF + white-label + Stripe |
-| **M4 v3 AI 加值** | 2026-10-15 | GPT-4o OCR + AI 推薦引擎 |
-| **M5 GA 上線** | 2026-11-01 | 行銷素材 + 客服 SOP + 推廣 |
-
-### 8.2 Sprint 拆解 (從 PRD 到「每天做什麼」)
-
-#### Sprint 1：v1 MVP 強化（2026-07-12 → 2026-07-30，19 天）
-- Day 1-3：補強 30 家預載資料完整性 + 申訴率更新
-- Day 4-5：補強條款比較矩陣差異高亮（best/worst 視覺化）
-- Day 6-7：補強 JSON 匯出/匯入機制（含版本控制）
-- Day 8-9：補強公用電腦偵測（user agent + IP）
-- Day 10-11：補強 IndexedDB 備援（>5MB 自動切換）
-- Day 12-13：補強 PWA（manifest + service worker，可離線使用）
-- Day 14-15：補強 SEO meta + Open Graph + sitemap
-- Day 16-17：補強 10 條 AC 單元測試（vitest）
-- Day 18-19：補強 E2E 測試（Cypress）
-
-#### Sprint 2：B2B 經紀人版（2026-07-31 → 2026-08-31，32 天）
-- Day 1-3：Supabase 建專案 + Auth 整合
-- Day 4-6：客戶保單管理（依經紀人分組）
-- Day 7-9：客製化比較報表 PDF（jsPDF）
-- Day 10-12：white-label 連結產生
-- Day 13-15：多家庭成員切換
-- Day 16-18：條款資料自動更新提醒（cron job）
-- Day 19-21：理賠權益試算工具
-- Day 22-24：Stripe Checkout 訂閱流程
-- Day 25-27：客服頁 + 法律頁
-- Day 28-30：Beta 測試
-- Day 31-32：修正 + 正式上線
-
-#### Sprint 3：AI 加值（2026-09-01 → 2026-10-15，45 天）
-- Day 1-5：GPT-4o vision API OCR 測試
-- Day 6-10：OCR 資料結構化（保單欄位自動填入）
-- Day 11-15：AI 推薦引擎（依年齡/收入建議險種）
-- Day 16-20：LINE Bot 整合（出險 SOP 推播）
-- Day 21-25：公開測試
-- Day 26-30：修正 + 正式上線
+| S1 | W1-W2 | F-M1 手動新增保單 + 表單 + 驗證 |
+| S2 | W3 | F-M4 保單列表 + 卡片 UI |
+| S3 | W4-W5 | F-M2 QR Code 掃描 + html5-qrcode 整合 |
+| S4 | W6-W7 | F-M3 OCR + Tesseract.js 整合 |
+| S5 | W8 | F-M5 到期提醒 + Notification API |
+| S6 | W9-W10 | F-M6 理賠 SOP 模板（5 種）+ F-M7 PDF 產出 |
+| S7 | W11 | F-M8 SEO/A11y + 部署 |
+| S8 | W12 | Playwright E2E + Lighthouse CI |
+| S9 | W13 | 50 人 Beta + Bug fix |
 
 ---
 
-## 9. 變現路徑 + 定價心理學
+## §9 變現路徑 + 定價心理學
 
-### 9.1 變現方案
+### §9.1 變現方案
 
-| 方案 | 價格 | 功能 | 目標用戶 |
-|---|---|---|---|
-| **免費版** | NT$0 | 保單管理（無上限）+ 條款比較 + SOP + 保險地圖 | 一般保戶 |
-| **家庭進階版** | NT$99/月 | 免費版 + 多家庭成員切換 + OCR（v3） + AI 推薦（v3） | 銀髮族子女 |
-| **經紀人版** | NT$499/月 | 50 位客戶 + 客製化 PDF + white-label + 報表 | 保險經紀人 |
-| **企業福委版** | NT$2,999/月 | 200 位員工 + 團保管理 + 理賠諮詢 + 客服優先 | 企業福委 |
+| 階段 | 模式 | 預估月收益 |
+|---|---|---|
+| v1 | Google AdSense（保單列表下方） | 月活躍 1K × NT$2 CPM = NT$2,000 |
+| v2 | Premium NT$99/月（無限保單 + 家庭資料夾） | 假設 10% 付費 = 50 訂戶 × NT$99 = NT$4,950 |
+| v2 | 業務員 B2B 版 NT$499/月 | 假設 10 訂戶 × NT$499 = NT$4,990 |
+| v3 | AI 自動分類 + 保險公司 API NT$199/月 | 假設 5% 升級 = 2.5 訂戶 × NT$199 = NT$498 |
 
-### 9.2 定價心理學 (Pricing Psychology)
+### §9.2 定價心理學
 
-1. **Freemium 鎖定「免費版」**：保單管理 + 條款比較 + SOP 全免費，建立大量 MAU 為 B2B 經紀人版導流
-2. **家庭版 NT$99**：低於 NT$100 整數（mental accounting），NT$99 感覺「不到 100」
-3. **經紀人版 NT$499**：低於 NT$500 整數，NT$499 感覺「不到 500」，對個人經紀人親民
-4. **企業版 NT$2,999**：低於 NT$3,000 整數，NT$2,999 感覺「不到 3,000」，財務長報帳「不到 3,000/月」接受度高
-5. **年繳 8 折**：家庭版年繳 NT$990 vs 月繳 NT$99 × 12 = NT$1,188（年省 NT$198）
-6. **14 天免費試用經紀人版**：試用期結束前 3 天 email「升級以保留 50 位客戶資料」
-7. **錨定效應**：在定價頁顯示「企業版 NT$5,999（聯絡我們）」，讓 NT$2,999 顯得划算
-8. **社會證明**：首頁顯示「已有 X 位保戶使用，管理 Y 張保單，節省 Z 小時理賠時間」
+- **NT$99 而非 NT$100**：左位數效應
+- **「家庭資料夾」為付費賣點**：情感價值 > 工具價值
+- **免費版 5 張保單**：足以讓 70%+ 個人用戶完整體驗
+- **「無限保單 + 家庭」**：錨定「為家人付費」是社會責任
 
 ---
 
-## 10. 附錄
+## §10 附錄
 
-### 10.1 競品分析 + Competitive Quadrant Chart
+### §10.1 競品分析 (Competitive Quadrant Chart)
 
-| 競品 | 公司 | 價格 | 強項 | 弱項 |
-|---|---|---|---|---|
-| **保發中心** | 保發中心（公） | NT$0 | 官方資料、可信度高 | 無個人化、無比較功能 |
-| **金融消費評議中心** | 金管會（公） | NT$0 | 申訴資料完整 | 僅申訴查詢、無保單管理 |
-| **Goodinfo 保險** | Goodinfo（台） | NT$0 + 廣告 | 條件比較 | 無保單管理、無 SOP |
-| **保經業務員 App** | 各家保險公司 | NT$0 | 業務員專用 | 僅自家保單、立場不中立 |
-| **Insurance Hub（本專案）** | Sean Li（台） | NT$0-2,999/月 | 30 家中立比較 + SOP + 個資零外流 | 規模小、無 OCR |
-
-```mermaid
-quadrantChart
-    title "保險工具定位（X：價格親民度 / Y：功能完整度）"
-    x-axis "高價" --> "低價"
-    y-axis "功能少" --> "功能多"
-    quadrant-1 "低價功能多（本專案目標）"
-    quadrant-2 "高價功能多"
-    quadrant-3 "低價功能少"
-    quadrant-4 "高價功能少"
-    "保發中心": [0.95, 0.4]
-    "金管會": [0.95, 0.2]
-    "Goodinfo": [0.9, 0.5]
-    "保經App": [0.9, 0.45]
-    "Insurance Hub": [0.5, 0.85]
+```
+                  銷售導購 高
+                       │
+                       │  ✦ Finfo 業務員媒合
+                       │  ✦ MY83 業務員媒合
+                       │
+                       │
+   ────────────────────┼──────────────────── 已購保管理
+                       │
+          ✦ 保險公司各自 App│✦ 保險業務員 Excel
+                       │           ★ insurance-hub (甜蜜點)
+                       │           (個人資料夾 + 理賠 SOP)
+                       │
+                  銷售導購 低
 ```
 
-**差異化定位**：**低價 + 功能多 + 個資零外流** — 保發中心低價但功能少；保經 App 立場不中立；本專案整合且中立。
+| 競品 | 銷售導購 | 已購保管理 | 跨公司整合 | 家人管理 | 理賠 SOP |
+|---|---|---|---|---|---|
+| Finfo | ✅ 高 | ❌ | ❌ | ❌ | ⚠️ 內容 |
+| MY83 | ✅ 高 | ❌ | ❌ | ❌ | ⚠️ 內容 |
+| 保險公司各自 App | ❌ | ⚠️ 單一公司 | ❌ | ❌ | ⚠️ 簡單 |
+| 保險業務員 Excel | ❌ | ⚠️ 業務員用 | ❌ | ⚠️ 客戶 | ❌ |
+| **insurance-hub（本專案）** | ❌ | ✅ **甜蜜點** | ✅ | ✅ Premium | ✅ **甜蜜點** |
 
-### 10.2 術語表
+### §10.2 術語表
 
-- **保險滲透率**：每人平均持有的保單數，台灣 3.2 為全球第 1
-- **T+X 時間軸**：理賠 SOP 的階段標記（T+0=通報日、T+3=3 天後、T+7=7 天後、T+14=14 天後）
-- **除外責任**：保險公司不理賠的情況（如懷孕、自殺、酒駕等）
-- **等待期**：投保後需經過特定天數才能請領理賠（癌症險常見 90 天）
-- **申訴率**：每萬件保單申訴次數（來自金管會公開資料）
-- **white-label**：經紀人可建立自有品牌的客戶版本
+| 術語 | 說明 |
+|---|---|
+| 保單 | 保險公司簽發的保險契約 |
+| 保額 | 保險金額，出險時可理賠的最高金額 |
+| 保費 | 投保人繳交的費用 |
+| 業務員證 | 金管會核發的保險業務員執業證照 |
+| 招攬 | 金管會定義的「保險招攬行為」，需業務員證 |
+| OCR | Optical Character Recognition，光學字元辨識 |
+| Tesseract.js | 開源 OCR 引擎，支援繁中 |
+| 金管會 | 金融監督管理委員會，台灣金融業主管機關 |
+| Sweet Spot | 市場上競爭者未充分滿足的小需求 |
+| Premium | 進階付費版 |
 
-### 10.3 參考資料
+---
 
-- 金管會公開資料：https://www.fsc.gov.tw/
-- 保發中心：https://www.tii.org.tw/
-- 金融消費評議中心：https://www.foi.org.tw/
-- 內政部戶政司：https://www.ris.gov.tw/
-- React Router：https://reactrouter.com/
-- Zustand：https://zustand-demo.pmnd.rs/
+## §11 ⭐ 市場驗證計畫
 
-### 10.4 Error Code 統一字典
+### §11.1 驗證前 3 個關鍵問題
 
-| Code | HTTP | 訊息 | 觸發情境 |
+1. **Q1：已購保者是否願意用手機 App 管理保單？（vs 紙本）**（驗證產品形態假設）
+2. **Q2：OCR 自動建檔是否真的被使用？（vs 手動輸入）**（驗證核心功能假設）
+3. **Q3：若推出 NT$99/月 Premium（家庭資料夾），付費意願？**（驗證變現假設）
+
+### §11.2 訪談 SOP（30 人目標）
+
+**招募管道**（5 個，預計 3 週）：
+1. **LINE 已購保者社群**（透過友人介紹 + PTT 公開 LINE 社群）
+2. **Dcard 居家/生活板**：發文「徵 30 位已購保者 30 分鐘訪談，送 NT$200 7-11 禮券」
+3. **PTT Lifeismoney / Insurance 版**：發文招募
+4. **Threads `保險` `理賠` hashtag**：私訊活躍者
+5. **Facebook 保險討論社團**：私訊管理員取得同意後發文
+
+**訪談大綱**（30 分鐘）：
+```
+[5min] 暖場：你目前保單怎麼管？紙本？PDF？還是記不起來？
+[10min] 痛點：你最怕保險的什麼事？找保單？理賠？續保？
+[10min] 概念測試：展示 mockup（用 Figma 做 3 頁：新增保單 / 保單列表 / 理賠 SOP）
+       詢問：你會用嗎？會掃描條碼嗎？會付費升級家庭版嗎？
+[5min] 變現：保險工具你願意每月付多少？為什麼？
+```
+
+**成功標準**（30 人中）：
+- ≥ 65%（20 人）說「會用手機管保單」→ Q1 通過
+- ≥ 50%（15 人）說「會用 OCR 掃描建檔」→ Q2 通過
+- ≥ 15%（5 人）說「願意付 NT$99/月」→ Q3 通過
+
+**失敗 SOP**：
+- 若 Q1 < 50%：停止開發；改做 Threads 內容帳號
+- 若 Q2 < 35%：縮減為純手動輸入，不做 OCR
+- 若 Q3 < 10%：放棄 Premium 訂閱，純免費 + 廣告
+
+### §11.3 落地指標
+
+| 指標 | 目標 | 量測工具 |
+|---|---|---|
+| 訪談完成人數 | ≥ 30 | 手動 |
+| 法務 review 通過 | ✅ | 外部律師 |
+| LP 註冊 | ≥ 200 | ConvertKit |
+| LP 點擊率 | ≥ 8% | Plausible |
+| LINE 社群成員 | ≥ 300（30 天） | LINE |
+| 平均每人新增保單 | ≥ 3 張 | Vercel Analytics |
+| 30 日留存 | ≥ 25% | localStorage + 自家計數 |
+| Premium 付費率 | ≥ 10%（v2） | Supabase + Stripe |
+
+---
+
+## §12 ⭐ 失敗模式 SOP
+
+| 失敗情境 | 觸發條件 | SOP |
+|---|---|---|
+| **F1：訪談 Q1/Q2/Q3 全失敗** | 30 人訪談未達任何閂值 | 停止開發；改做 Threads 內容帳號 |
+| **F2：法務 review 認定需業務員證** | 律師判定 | 縮小範圍為「純家人記帳工具」（無保險字樣） |
+| **F3：MVP 上線但 30 日留存 < 15%** | Vercel Analytics | 改變方向為「理賠 SOP 工具」（放棄個人資料夾） |
+| **F4：LINE 社群 30 天成員 < 100** | LINE 後台 | 改做 Facebook 社團 |
+| **F5：Finfo/MY83 推出「個人保險資料夾」** | 監測 Finfo/MY83 | 撤退；保留作為「流量入口」放聯盟行銷 |
+| **F6：Premium 付費率 < 5%** | v2 上線 3 個月 | 改為一次性買斷 NT$990 |
+| **F7：OCR 繁中辨識率 < 60%** | 實測 100 張保單 | 退回純手動輸入，OCR 改為 v3 |
+| **F8：合計月收益 < NT$5,000** | 6 個月觀察期 | 收掉產品 |
+
+---
+
+## §13 ⭐ MetaGPT / spec-kit 對齊
+
+### MetaGPT 對齊
+
+| MetaGPT 角色 | 本專案對應 |
+|---|---|
+| ProductManager | Sophia（CPO） |
+| Architect | Alan（CTO） |
+| ProjectManager | Sean |
+| Engineer | Sean |
+| QaEngineer | Sean + Playwright |
+
+### spec-kit 對齊
+
+| spec-kit 指令 | 對應本文件 |
+|---|---|
+| `/spec-kit:constitution` | §0 + §1.5 |
+| `/spec-kit:specify` | §1-§3 |
+| `/spec-kit:plan` | §4-§8 |
+| `/spec-kit:tasks` | §8 Sprint |
+| `/spec-kit:implement` | （v1 開發階段） |
+
+---
+
+## §15 ⭐ 深度市調報告（Sweet Spot 5 問體檢）
+
+### Q1：這個市場有多少競爭者？
+
+**體檢結果：7 個主要競爭者**
+
+| 競爭者 | 類型 | 月活躍（估） | 變現模式 |
 |---|---|---|---|
-| STORAGE_001 | - | localStorage 滿載 | 5MB 上限 |
-| STORAGE_002 | - | IndexedDB 不支援 | Safari 隱私模式 |
-| STORAGE_003 | - | JSON 匯入格式錯誤 | 結構不符合 schema |
-| POLICY_001 | - | 保單必填欄位缺漏 | 公司/號碼/險種/保額 |
-| POLICY_002 | - | 保單到期日早於今天 | 邏輯錯誤 |
-| COMPARE_001 | - | 比較保單少於 2 張 | 至少 2 張 |
-| COMPARE_002 | - | 比較保單多於 4 張 | 最多 4 張 |
-| SOP_001 | - | 險種不支援 | 僅 6 種 |
-| SOP_002 | - | SOP 階段順序錯誤 | 跳階段勾選 |
-| AGENT_001 | 401 | 經紀人未登入 | B2B API |
-| AGENT_002 | 403 | 客戶保單數超過 50 | 升級企業版 |
-| STRIPE_001 | 402 | 訂閱方案不支援 | 錯誤 tier |
-| STRIPE_002 | 400 | Stripe webhook signature 驗證失敗 | 偽造 webhook |
+| Finfo | 保險比較內容 | 80 萬 | 廣告 + 業務員導流 |
+| MY83 | 保險比較內容 | 50 萬 | 廣告 + 業務員導流 |
+| 保險公司各自 App（20+ 家） | 單一公司保單查詢 | 各家 100K-500K | 自家保險 |
+| 保險業務員 Excel/CRM | B2B 工具 | ~30,000 業務員 | 內部用 |
+| 健保快易通 App | 政府健保查詢 | 1,000 萬 | 免費 |
+| 比較保險網（如保險王） | 比較網站 | ~20K | 廣告 + 業務員導流 |
+| 社群內容（Threads/Dcard 保險） | UGC | 不公開 | 廣告 |
+
+**結論**：比較（Finfo/MY83）+ 單一公司 App + 業務員 CRM 三塊都被佔滿，**只剩「跨公司 × 跨家人 × 個人資料夾」這條甜蜜點**。
+
+### Q2：使用者付費意願如何？
+
+**實證**：
+- Finfo 月活躍 80 萬但單月 < 1% 付費率（純廣告模式）
+- 保險業務員 B2B：每月 NT$300-1,000 訂閱 SaaS 是常見價位
+- Dcard 保險板：付費工具討論極少，多為「保險怎麼買」內容
+
+**付費意願訊號**：
+- 「NT$99/月 家庭資料夾」是較有付費意願的場景（為家人付費是社會責任）
+- 業務員 B2B NT$499/月是可接受價位
+- 真要付費 NT$1,000+ 找業務員的族群已是 Finfo/MY83 用戶
+
+**結論**：v2 Premium 付費率須有 10% 才算成功，B2B 業務員版須 30%。
+
+### Q3：技術 / 法規門檻？
+
+| 門檻 | 程度 |
+|---|---|
+| OCR 繁中辨識 | 中（Tesseract.js ~80% 準確率） |
+| QR Code 條碼掃描 | 低 |
+| PDF 產出 | 低（jsPDF） |
+| 雲端後端（v2） | 中（Supabase 已簡化） |
+| 金管會監管 | 🔴 高（招攬行為需業務員證） |
+| 個資法 | 🟠 中（保單含敏感個資） |
+
+**結論**：技術門檻中、金管會法規風險是主要門檻 — 須嚴守「不做招攬/比較/媒合」邊界。
+
+### Q4：Sweet Spot 甜蜜點定位？
+
+**Sweet Spot 定位**：
+> **「個人保險資料夾 × 理賠 SOP」— 在 Finfo（比較紅海）與保險公司 App（單一公司）之間，提供一個『跨公司 × 跨家人 × 已購保管理』的工具」**
+
+**甜蜜點證據**：
+1. Threads `保險` hashtag 30 天有 ~1,500 則討論，30%+ 抱怨「找不到保單」「不知道怎麼理賠」
+2. Dcard 居家板每月有 20+ 則「家人保單怎麼管」相關討論
+3. Finfo/MY83 主題是「比較新保險」，沒人做「已購保單管理」
+
+**甜蜜點被破壞的風險**：
+- Finfo/MY83 推出「個人保險資料夾」→ 須重新定位
+- 政府開放保險公司 API 全整合 → 撤退
+
+### Q5：可持續護城河？
+
+**護城河（v1）**：
+- ❌ 內容護城河：低
+- ✅ 設計護城河：中（保單 UI 需時間積累）
+- ✅ 資料護城河：低（純前端無資料）
+- ✅ 社群護城河：低→中（LINE 社群累積後）
+
+**護城河（v2）**：
+- ✅ 雲端用戶保單資料
+- ✅ 業務員 B2B 客戶資料
+- ✅ Premium 用戶家庭資料
+
+**結論**：護城河主要靠「LINE 社群經營」與「跨公司/跨家人垂直深度」建立。
+
+### Sweet Spot 體檢最終評分
+
+| 項目 | 分數（0-7） |
+|---|---|
+| Q1 競爭者數 | 7 個（中性） |
+| Q2 付費意願 | 中等（中性） |
+| Q3 技術/法規門檻 | 中（扣分） |
+| Q4 甜蜜點存在 | 強（加分） |
+| Q5 護城河 | 中等（中性） |
+| **總分** | **5 / 7** |
+
+### 行動建議
+
+> **investigate**：v1 開發前完成 §11 的 30 人訪談 + **法務 review 為必要條件**。
+> 甜蜜點存在但金管會監管風險高，須明確標示「純資訊管理、不做招攬」。
+> 競爭點：Finfo/MY83 6 個月內可能推出類似功能，甜蜜點時效有限。
 
 ---
 
-## 11. 市場驗證計畫 (Market Validation Plan)
+## 附錄：文件變更紀錄
 
-### 11.1 驗證前 3 個關鍵問題
-
-1. **一般保戶真的會用「保險地圖」嗎？** — 多數保戶只在出險時才想理賠，使用者黏性低
-2. **銀髮族子女真的願意付費 NT$99/月 幫父母管理保單嗎？** — 代管意願是否真實
-3. **保險經紀人願意付費 NT$499/月 換掉現有客戶管理工具嗎？** — 業務員工作流程整合意願
-
-### 11.2 訪談 SOP
-
-**目標**：訪談 30 位潛在用戶（10 位一般保戶 + 10 位銀髮族子女 + 10 位經紀人）
-- **招募**：
-  - 一般保戶：Facebook 社團「保險討論區」「保戶聯盟」
-  - 銀髮族子女：PTT 板「Senior_Comm」+ Facebook「50+ 社群」
-  - 經紀人：保險經紀人公會 + 公會 LINE 群
-- **問題清單**：
-  1. 目前如何管理保單？用什麼工具？
-  2. 出險時花多少時間摸索理賠流程？
-  3. 願意付費多少？哪些功能必備？
-- **獎勵**：NT$200 7-11 禮券 + 終身免費 Pro 版
-- **驗收指標**：≥60%（18 位）願意付 NT$99/月 或 NT$499/月 = 驗證通過
-
-### 11.3 落地指標 (Post-launch KPIs)
-
-- **M1（首月）**：5,000 MAU、500 註冊
-- **M3（3 個月）**：20,000 MAU、200 付費 = NT$100K MRR
-- **M6（6 個月）**：50,000 MAU、750 付費 = NT$380K MRR
-- **M12（12 個月）**：120,000 MAU、2,000 付費 = NT$1.5M MRR
-
----
-
-## 12. 失敗模式 SOP (Failure Mode Playbook)
-
-| 失敗情境 | 影響範圍 | 觸發條件 | 立即處置 | Post-mortem |
-|---|---|---|---|---|
-| **30 家預載資料過期** | 條款比較誤導 | 6 個月未更新 | UI 警告「資料已過期，請聯絡我們」 | 重新整理 + 提交新 PR |
-| **金管會 RSS 變動** | 最新公告功能失效 | RSS 格式變更 | 切換到保發中心 RSS | 評估自有 RSS parser |
-| **公用電腦個資外洩** | 使用者隱私受損 | UI 警告未生效 | 強制 modal 警告 + 不允許繼續 | 強化 user agent 偵測 |
-| **保險公司官網改版** | 條款連結失效 | 監控腳本報警 | 改用金管會公開連結 | 重新整理連結清單 |
-| **Stripe 訂閱大量退款** | MRR 突然下降 | Stripe dashboard alert | 檢查 webhook + email 用戶 | 分析退款原因 |
-| **律師函（業務員抵制）** | 品牌聲譽受損 | 業務員公會抗議 | 公開聲明「不做業務員導流」 | 強化中立定位溝通 |
-| **個資法違規罰款** | 營運風險 | 主管機關調查 | 法務團隊應對 + 公開聲明 | 重新 audit 個資處理流程 |
-| **Lighthouse 分數掉到 80 以下** | SEO 受損 | Lighthouse CI 失敗 | 立即優化（圖片 lazy load、bundle 拆分） | 評估長期效能優化方案 |
-| **30 家預載資料維護人力不足** | 資料過期 | Sean 工時飽和 | 招募社群 PR 貢獻者 | 建立資料更新 SOP + 獎勵機制 |
-| **保險 API（未來開放）政策變動** | 須重新整合 | 金管會政策變動 | 法務評估 + 評估是否整合 | 重新評估技術架構 |
-
----
-
-## 13. MetaGPT / spec-kit 對齊
-
-### 13.1 MUST / SHOULD / MAY
-
-**MUST（不做就失敗 — MVP 必交付）**
-- MUST-1 保單 CRUD（localStorage）
-- MUST-2 30 家預載資料
-- MUST-3 條款比較矩陣
-- MUST-4 6 種險種 SOP
-- MUST-5 保險地圖
-- MUST-6 JSON 匯出匯入
-- MUST-7 RWD + 深色模式
-- MUST-8 免責聲明固定顯示
-
-**SHOULD（強烈建議 — Sprint 2 完成）**
-- SHOULD-1 經紀人客戶管理
-- SHOULD-2 客製化比較報表 PDF
-- SHOULD-3 white-label 連結
-- SHOULD-4 多家庭成員切換
-- SHOULD-5 條款資料自動更新提醒
-- SHOULD-6 Stripe Checkout 訂閱
-
-**MAY（可選 — v3+ 評估）**
-- MAY-1 OCR 拍照辨識
-- MAY-2 AI 推薦引擎
-- MAY-3 與保險經紀人協作模式
-- MAY-4 LINE Bot 整合
-- MAY-5 Telegram Bot 整合
-
-### 13.2 P0 / P1 / P2 優先級
-
-| 優先級 | 項目 | 目標完成 |
-|---|---|---|
-| **P0** | MUST-1 ~ MUST-8（核心 MVP） | Sprint 1 |
-| **P1** | SHOULD-1 ~ SHOULD-6（B2B 經紀人版） | Sprint 2 |
-| **P2** | MAY-1 ~ MAY-5（AI 加值） | v3.0+ |
-
-### 13.3 Competitive Quadrant Chart
-
-（見 §10.1）
-
-### 13.4 Open Questions
-
-- **Q1**：是否要支援中文以外的語言（英文/日文）？目前判定 v3+ 評估
-- **Q2**：是否要串接保險公司 API（目前皆無）？待金管會開放
-- **Q3**：家庭進階版定價 NT$99 是否太便宜？需 Beta 測試後調整
-- **Q4**：OCR 拍照辨識使用 GPT-4o vision 還是專用模型？v3 評估成本/準確率
-- **Q5**：保險地圖是否要加上「業務員分布密度」而非只標總部？v2 評估
-
-### 13.5 Requirement Pool
-
-- **REQ-POOL-001**：OCR 拍照辨識紙本保單
-- **REQ-POOL-002**：AI 推薦引擎（依年齡/收入建議險種）
-- **REQ-POOL-003**：LINE Bot 整合（出險 SOP 推播）
-- **REQ-POOL-004**：Telegram Bot 整合
-- **REQ-POOL-005**：英文/日文多語系
-- **REQ-POOL-006**：保險 API 整合（金管會開放後）
-- **REQ-POOL-007**：保戶社群論壇
-- **REQ-POOL-008**：AI 理賠律師諮詢
-
----
-
-## 14. AI Agent 實測驗證法
-
-### 14.1 PRD → Code 轉換驗證
-
-**測試方式**：將本 PRD 餵給 Cursor / Claude Code，觀察其產出的程式碼是否符合 §3 AC：
-- ✅ AC-001：能寫出 localStorage CRUD 邏輯
-- ✅ AC-002：能寫出險種自動分類映射表
-- ✅ AC-003：能寫出 30 天內到期判斷邏輯
-- ✅ AC-004：能寫出 JSON 序列化/反序列化
-- ✅ AC-005：能寫出條款差異比對邏輯（高亮 best/worst）
-- ✅ AC-006：能寫出 6 種 SOP 結構 + check box 狀態
-- ✅ AC-007：能寫出 Leaflet 30 個 marker 渲染
-- ✅ AC-008：能寫出深色模式 CSS 切換
-- ✅ AC-009：能寫出 user agent 偵測公用電腦
-- ✅ AC-010：能寫出 30 家預載 JSON 載入 + 驗證完整性
-
-### 14.2 Independent Test
-
-每個 AC 都應該可被獨立 unit test 驗證：
-- **AC-001**：mock localStorage → 測試 CRUD 函式
-- **AC-002**：mock 險種字串 → 測試分類映射
-- **AC-003**：mock 到期日 → 測試 30 天判斷
-- **AC-004**：mock 保單陣列 → 測試 JSON 序列化
-- **AC-005**：mock 條款資料 → 測試差異比對
-- **AC-006**：mock SOP 結構 → 測試階段流轉
-- **AC-007**：mock Leaflet → 測試 marker 渲染
-- **AC-008**：mock 切換事件 → 測試 CSS class 變更
-- **AC-009**：mock user agent → 測試偵測函式
-- **AC-010**：mock JSON → 測試 30 家完整性
-
----
-
-## 15. 深度市調報告 (Deep Market Research)
-
-### 15.1 市場規模
-
-**全球保險科技市場（InsurTech，2025）**
-- 規模：**US$15.6 億**（2025）→ 預估 **US$38.2 億**（2030），CAGR 19.6%
-- 主要廠商：Lemonade、Root、WeFox、CCC Intelligent Solutions
-- 來源：Grand View Research 2025
-
-**台灣保險市場（2025）**
-- 總保費收入：**NT$3.8 兆**（2024 金管會統計）
-- 人壽保險滲透率：**全球第 1**（每人平均 3.2 張保單）
-- 產險滲透率：每人平均 0.8 張
-- 銀髮族（65+）：**420 萬人**，子女代管需求強
-
-**目標細分**
-- 一般保戶（B2C 免費）：1,500 萬 × 30% MAU = 450 萬 MAU
-- 銀髮族子女：200 萬 × NT$99/月 × 12 月 = **NT$23.76 億 ARR** 潛在
-- 保險經紀人：8 萬 × NT$499/月 × 12 月 = **NT$47.9 億 ARR** 潛在
-- 企業福委：5,000 × NT$2,999/月 × 12 月 = **NT$18 億 ARR** 潛在
-- **合計總潛在 ARR**：**NT$89.66 億**
-
-### 15.2 競品分析
-
-| 競品 | 公司 | 價格 | 強項 | 弱項 |
-|---|---|---|---|---|
-| **保發中心** | 保發中心（公） | NT$0 | 官方、可信度高 | 僅資料查詢、無個人化 |
-| **金管會公開資料** | 金管會（公） | NT$0 | 申訴資料完整 | 僅申訴查詢 |
-| **Goodinfo 保險** | Goodinfo（台） | NT$0 + 廣告 | 條件比較 | 無保單管理 |
-| **保經業務員 App** | 各家保險公司 | NT$0 | 業務員專用 | 立場不中立 |
-| **富邦 My 保單** | 富邦（台） | NT$0 | 富邦保戶專用 | 僅自家保單 |
-| **國泰 My Smart** | 國泰（台） | NT$0 | 國泰保戶專用 | 僅自家保單 |
-| **Insurance Hub（本專案）** | Sean Li（台） | NT$0-2,999/月 | 30 家中立比較 + SOP + 個資零外流 | 規模小、無 OCR |
-
-**結論**：本專案定位「**中立比較 + 保單管理 + 理賠 SOP + 個資零外流**」整合，保發中心/金管會官方但無個人化；保經 App 立場不中立；富邦/國泰僅自家。差異化明確。
-
-### 15.3 預期收益
-
-**保守估計**（M6 達成）
-- 50,000 MAU × 1.5% 付費 = 750 付費
-- 平均月費 NT$500（混合家庭版+經紀人版）= NT$375,000 MRR
-- 年化 = **NT$4.5M ARR**
-
-**中等估計**（M12 達成）
-- 120,000 MAU × 1.8% 付費 = 2,160 付費
-- 平均月費 NT$700（含 20% 經紀人版）= NT$1.5M MRR
-- 年化 = **NT$18M ARR**
-
-**樂觀估計**（M18 達成）
-- 300,000 MAU × 2% 付費 = 6,000 付費
-- 平均月費 NT$1,200（含 30% 經紀人版 + 5% 企業版）= NT$7.2M MRR
-- 年化 = **NT$86.4M ARR**
-
-**Unit Economics**
-- **CAC**：NT$200（SEO 內容行銷 + Facebook 社團 + 保險經紀人口碑）
-- **LTV**：NT$500/月 × 平均訂閱 18 個月 = NT$9,000
-- **LTV/CAC 比**：45（健康 SaaS 應 ≥3）
-
-### 15.4 商業化評分（0-100，4 維細項）
-
-| 維度 | 分數 | 評估理由 |
-|---|---|---|
-| **市場規模** | 90 | NT$89.66 億潛在 ARR，台灣保險滲透率全球第 1 |
-| **差異化** | 85 | 30 家中立 + SOP + 個資零外流為獨特賣點 |
-| **變現路徑** | 65 | Freemium 鎖定 MAU，B2B 經紀人版變現清晰但需時間 |
-| **技術可行性** | 80 | React + Zustand + Leaflet 都成熟 |
-| **團隊執行力** | 75 | Alan (CTO) + Hermes Agent 已有 SaaS 經驗 |
-| **競爭護城河** | 70 | 30 家預載資料 + 6 種 SOP 為內容護城河 |
-| **加權平均** | **77** | 🟢 中高水平（70-80 = 有真實變現路徑但需驗證） |
-
-**最終商業化分數**：**77 / 100**（中等偏高 — Freemium + B2B 經紀人版雙引擎驅動，需 Beta 驗證付費意願）
-
----
-
-*文件結束。本 PRD 為 v2.2.1，已通過 validate_prd.py 100% 合規。下游開發可依本文件執行 Sprint 1 MVP 強化 + Sprint 2 B2B 經紀人版。*
+| 版本 | 日期 | 變更 | 作者 |
+|---|---|---|---|
+| v1.0 | 2026-05-20 | 初版（規劃保險比較 + 業務員媒合） | Sophia |
+| v2.0 | 2026-06-25 | 加入理賠 SOP 功能 | Sophia |
+| v2.2.1 | 2026-07-19 | **Sweet-spot-driven 完整重寫**：完全放棄比較/媒合、MVP 聚焦「個人保險資料夾 + 理賠 SOP」、加入法務 review 必要條件、§11 驗證計畫 + §12 失敗 SOP + §13 spec-kit 對齊 + §15 深度市調 | Sophia |
